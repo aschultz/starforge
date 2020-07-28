@@ -9,12 +9,21 @@ import {
   Button,
   Heading,
 } from "@chakra-ui/core";
+import { Editor } from "./Editor";
+import "./App.css";
 
 function App() {
   const theme = useTheme();
   return (
-    <Box backgroundColor={theme.colors.gray[800]} height="100vh">
+    <Flex
+      direction="column"
+      backgroundColor={theme.colors.gray[800]}
+      height="100vh"
+      justifyContent="flex-start"
+      alignItems="stretch"
+    >
       <Flex
+        flex={0}
         direction="row"
         justifyContent="space-between"
         alignItems="center"
@@ -28,7 +37,9 @@ function App() {
           <Button leftIcon="add">Add</Button>
         </Flex>
       </Flex>
-    </Box>
+
+      <Editor />
+    </Flex>
   );
 }
 

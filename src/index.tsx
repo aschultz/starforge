@@ -5,7 +5,6 @@ import {
   ThemeProvider,
   theme as defaultTheme,
 } from "@chakra-ui/core";
-import "./index.css";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
 
