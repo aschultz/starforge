@@ -1,8 +1,9 @@
 import React from "react";
-import { Flex, Text, IconButton, Icon, Button, Heading, DefaultTheme, ITheme, Stack } from "@chakra-ui/core";
+import { Flex, Text, IconButton, Icon, Button, Heading, DefaultTheme, ITheme, Stack, Tooltip } from "@chakra-ui/core";
 import { GraphEditor } from "./editor/GraphEditor";
 import "./App.css";
 import { withTheme } from "emotion-theming";
+import { MdZoomOutMap } from "react-icons/md";
 
 type Props = {
     theme: ITheme;
@@ -38,9 +39,11 @@ class _App extends React.Component<Props> {
                         StarForge
                     </Heading>
                     <Stack isInline={true} justify="right" spacing={"10px"} paddingY="10px">
-                        <IconButton icon="add" aria-label="Add" onClick={this.onAddClick} />
+                        <IconButton icon="add" aria-label="Add" onClick={undefined} />
                         <IconButton icon="delete" aria-label="Remove" onClick={undefined} />
-                        <IconButton icon="search" aria-label="Reset Zoom" onClick={undefined} />
+                        <Tooltip label="Reset Zoom" aria-label="Reset Zoom" showDelay={500}>
+                            <IconButton icon={MdZoomOutMap} aria-label="Reset Zoom" onClick={this.editor.resetZoom} />
+                        </Tooltip>
                     </Stack>
                 </Flex>
 
@@ -65,10 +68,6 @@ class _App extends React.Component<Props> {
         } else {
             this.editor.detach();
         }
-    };
-
-    private onAddClick = () => {
-        //this.editor.addNode();
     };
 }
 

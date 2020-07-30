@@ -1,141 +1,158 @@
-import paper from "paper/dist/paper-core";
-
-type Dictionary<T> = { [key: string]: T };
-
-function removeItem<T>(item: T, array: T[]) {
-    const index = array.indexOf(item);
-    if (index >= 0) {
-        array.splice(index, 1);
-    }
-}
-
-enum ConnectionType {
-    Directed,
-    Bidirectional,
-}
-
-class Node {
-    nodeId: number;
-    data: Dictionary<string> = {};
-    connections: Connection[] = [];
-    group: paper.Group;
-
-    constructor(id: number, center: paper.Point) {
-        this.nodeId = id;
-
-        this.group = new paper.Group();
-        this.group.onMouseDrag = this.onDrag;
-
-        const width = 100;
-        const height = 50;
-        const bounds = new paper.Rectangle(center.x - width / 2, center.y - height / 2, width, height);
-        const box = new paper.Path.Rectangle(bounds);
-        this.group.addChild(box);
-    }
-
-    get position(): paper.Point {
-        return this.group.position;
-    }
-    set position(p: paper.Point) {
-        this.group.position = p;
-
-        for (const connection of this.connections) {
-            connection.update();
-        }
-    }
-
-    getConnections(node: Node): Connection[] {
-        return this.connections.filter((x) => x.fromNode === node || x.toNode === node);
-    }
-
-    onDrag = (e: paper.MouseEvent) => {
-        this.position = this.position.add(e.delta);
-    };
-
-    dispose() {
-        this.group.remove();
-    }
-}
-
-class Connection {
-    connectionId: number;
-    fromNode: Node;
-    toNode: Node;
-
-    path: paper.Path;
-
-    constructor(id: number, from: Node, to: Node) {
-        this.connectionId = id;
-        this.fromNode = from;
-        this.toNode = to;
-
-        this.path = new paper.Path();
-        this.path.strokeColor = new paper.Color("black");
-        this.update();
-    }
-
-    update() {
-        this.path.firstSegment.point = this.fromNode.position;
-        this.path.lastSegment.point = this.toNode.position;
-    }
-
-    dispose() {
-        this.path.remove();
-    }
-}
+import { EditorContext } from "./Context";
+import { RenderConnection } from "./Connection";
+import { RenderNode } from "./Node";
+import { InteractionMode, PaperMouseEvent, PaperKeyEvent, IConnection, INode } from "./Types";
+import { Point } from "paper/dist/paper-core";
 
 export class GraphEditor {
-    canvas: HTMLCanvasElement | undefined;
-    project: paper.Project | undefined;
-    view: paper.View | undefined;
-
-    mainTool: paper.Tool | undefined;
-    addTool: paper.Tool | undefined;
+    context!: EditorContext;
 
     maxId = 0;
-    nodes = new Map<number, Node>();
-    connections = new Map<number, Connection>();
+    nodes = new Map<number, RenderNode>();
+    connections = new Map<number, RenderConnection>();
+
+    isDragging = false;
+
+    tempConnection!: paper.Path;
 
     attach(canvas: HTMLCanvasElement) {
-        this.canvas = canvas;
-        this.project = new paper.Project(canvas);
-        this.view = this.project.view;
-        this.view.center = new paper.Point(0, 0);
+        this.context = new EditorContext(canvas);
 
-        canvas.addEventListener("wheel", this.onWheel);
-        this.view.onMouseDrag = this.onMouseDrag;
+        this.context.canvas.addEventListener("wheel", this.onWheel);
+
+        const paper = this.context.paper;
+        const view = this.context.view;
+        view.onClick = this.onClick;
+        view.onMouseDown = this.onMouseDown;
+        view.onMouseUp = this.onMouseUp;
+        view.onMouseDrag = this.onMouseDrag;
+        view.onMouseMove = this.onMouseMove;
+        (view as any).onKeyDown = this.onKeyDown;
+        (view as any).onKeyUp = this.onKeyUp;
 
         // Draw an indicator at the center of the canvas
-        let a = new paper.Path.Line(new paper.Point(-5, 0), new paper.Point(5, 0));
-        let b = new paper.Path.Line(new paper.Point(0, -5), new paper.Point(0, 5));
-        let cross = new paper.Group([a, b]);
+        const a = new paper.Path.Line(new paper.Point(-5, 0), new paper.Point(5, 0));
+        const b = new paper.Path.Line(new paper.Point(0, -5), new paper.Point(0, 5));
+        const cross = new paper.Group([a, b]);
         cross.strokeColor = new paper.Color("black");
+        this.context.backgroundLayer.addChild(cross);
+
+        this.tempConnection = new paper.Path.Line(new paper.Point(0, 0), new paper.Point(0, 0));
+        this.tempConnection.strokeColor = new paper.Color("black");
+        this.tempConnection!.visible = false;
+        this.context.connectionsLayer.addChild(this.tempConnection);
+
+        this.setMode(InteractionMode.Move);
     }
 
     detach() {
-        if (this.canvas) {
-            this.canvas.removeEventListener("wheel", this.onWheel);
-        }
-        if (this.project) {
-            this.project.remove();
-            this.project = undefined;
-            this.view = undefined;
+        if (this.context) {
+            this.context.canvas.removeEventListener("wheel", this.onWheel);
+            this.context.dispose();
         }
     }
 
-    onMouseDrag = (e: any) => {
-        // Move the camera around
-        const movement = new paper.Point(e.event.movementX, e.event.movementY);
-        const correctedMove = movement.divide(this.view!.zoom);
-
-        this.view!.center = this.view!.center.subtract(correctedMove);
+    onClick = (e: PaperMouseEvent) => {
+        const context = this.context!;
+        if (e.event.button === 0) {
+            if (context.interactionMode === InteractionMode.Add) {
+                this.createNode(e.point);
+            } else if (context.interactionMode === InteractionMode.Connect) {
+                // Hit test. If we hit a box, start or end a connection
+                // If we miss, do nothing
+                const results = context.project.hitTest(e.point, {
+                    fill: true,
+                    stroke: true,
+                    bounds: true,
+                    hitTolerance: 2,
+                });
+                console.log(results);
+            }
+        }
     };
 
+    onMouseDown = (e: PaperMouseEvent) => {};
+
+    onMouseUp = (e: PaperMouseEvent) => {
+        this.isDragging = false;
+    };
+
+    onMouseMove = (e: PaperMouseEvent) => {
+        // If connection has started, update connection end position
+    };
+
+    onMouseDrag = (e: PaperMouseEvent) => {
+        const context = this.context;
+        if (context.interactionMode === InteractionMode.Move) {
+            this.isDragging = true;
+
+            // Move the camera around
+            const view = this.context.view;
+            const movement = new Point(e.event.movementX, e.event.movementY);
+            const correctedMove = movement.divide(view.zoom);
+
+            view.center = view.center.subtract(correctedMove);
+        }
+    };
+
+    onKeyDown = (e: PaperKeyEvent) => {
+        if (e.event.repeat || this.isDragging) {
+            return;
+        }
+
+        if (e.key === "shift") {
+            this.setMode(InteractionMode.Add);
+        } else if (e.key === "control") {
+            this.setMode(InteractionMode.Connect);
+        }
+    };
+    onKeyUp = (e: PaperKeyEvent) => {
+        const context = this.context;
+        if (this.isDragging) {
+            return;
+        }
+
+        if (context.interactionMode === InteractionMode.Add && e.key === "shift") {
+            this.setMode(InteractionMode.Move);
+        } else if (context.interactionMode === InteractionMode.Connect && e.key === "control") {
+            this.setMode(InteractionMode.Move);
+        }
+    };
+
+    setMode(newMode: InteractionMode) {
+        const context = this.context;
+        if (context.interactionMode === newMode) {
+            return;
+        }
+
+        if (context.interactionMode === InteractionMode.Connect) {
+            // Clear in-progress connection
+        }
+
+        const canvas = this.context.canvas;
+
+        if (newMode === InteractionMode.Add) {
+            canvas.style.cursor = "cell";
+        } else if (newMode === InteractionMode.Connect) {
+            canvas.style.cursor = "crosshair";
+        } else {
+            canvas.style.cursor = "default";
+        }
+        // TODO: Force a redraw to get the cursor to update without moving the mouse
+
+        context.interactionMode = newMode;
+    }
+
     onWheel = (e: WheelEvent) => {
+        // Prevent zooming the browser window with Ctrl+Scroll. Only zoom the canvas.
+        e.preventDefault();
+
+        const view = this.context!.view;
+
         // Zoom the camera
         const deltaY = e.deltaY;
-        const currentZoom = this.view!.zoom;
-        const currentPosition = this.view!.center;
+        const currentZoom = view.zoom;
+        const currentPosition = view.center;
 
         // TODO: Zoom based on cursor position
 
@@ -150,12 +167,33 @@ export class GraphEditor {
             newZoom = 1;
         }
 
-        this.view!.zoom = newZoom;
+        view.zoom = newZoom;
+    };
+
+    resetZoom = () => {
+        if (this.context) {
+            this.context.view.zoom = 1;
+        }
     };
 
     createNode = (position: paper.Point) => {
-        let node = new Node(++this.maxId, position);
-        this.nodes.set(node.nodeId, node);
+        let node = new RenderNode(++this.maxId, position, this.context);
+        this.nodes.set(node.id, node);
+    };
+
+    removeNode = (n: number | INode) => {
+        const node = typeof n === "number" ? this.nodes.get(n) : n;
+        if (!node) {
+            return;
+        }
+
+        // Removing a node should also remove all of its connections
+        for (const connection of node.getConnections()) {
+            this.removeConnection(connection.id);
+        }
+
+        node.dispose();
+        this.nodes.delete(node.id);
     };
 
     createConnection = (from: number, to: number) => {
@@ -163,45 +201,30 @@ export class GraphEditor {
         const startNode = this.nodes.get(from);
         const endNode = this.nodes.get(to);
         if (!startNode || !endNode) {
-            // ERROR
-            return;
+            throw Error("Invalid node address to create connection");
         }
 
-        const existingConnections = startNode.getConnections(endNode);
+        const existingConnections = startNode.getConnections(endNode.id);
         if (existingConnections.length > 0) {
             return;
         }
 
-        const connection = new Connection(++this.maxId, startNode, endNode);
-        this.connections.set(connection.connectionId, connection);
+        const connection = new RenderConnection(++this.maxId, startNode, endNode, this.context);
+        startNode.addConnection(connection);
+        endNode.addConnection(connection);
+
+        this.connections.set(connection.id, connection);
     };
 
-    removeNode = (nodeId: number) => {
-        const node = this.nodes.get(nodeId);
-        if (!node) {
-            return;
-        }
-
-        node.dispose();
-
-        // Removing a node should also remove all of its connections
-        for (const connection of node.connections) {
-            this.removeConnection(connection.connectionId);
-        }
-
-        this.nodes.delete(nodeId);
-    };
-
-    removeConnection = (connectionId: number) => {
-        const connection = this.connections.get(connectionId);
+    removeConnection = (c: number | IConnection) => {
+        const connection = typeof c === "number" ? this.connections.get(c) : c;
         if (!connection) {
             return;
         }
 
+        connection.fromNode.removeConnection(connection);
+        connection.toNode.removeConnection(connection);
         connection.dispose();
-
-        removeItem(connection, connection.fromNode.connections);
-        removeItem(connection, connection.toNode.connections);
-        this.connections.delete(connectionId);
+        this.connections.delete(connection.id);
     };
 }
