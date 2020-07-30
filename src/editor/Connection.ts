@@ -5,13 +5,15 @@ export class GraphConnection implements IConnection {
     id: number;
     fromNode: INode;
     toNode: INode;
-    type: ConnectionType;
+    connectionType: ConnectionType;
+
+    readonly type = "link";
 
     constructor(id: number, from: INode, to: INode) {
         this.id = id;
         this.fromNode = from;
         this.toNode = to;
-        this.type = ConnectionType.Bidirectional;
+        this.connectionType = ConnectionType.Bidirectional;
     }
 
     update() {}
@@ -20,12 +22,17 @@ export class GraphConnection implements IConnection {
 }
 
 export class RenderConnection extends GraphConnection {
+    context: EditorContext;
     path: paper.Path;
 
     constructor(id: number, from: INode, to: INode, context: EditorContext) {
         super(id, from, to);
+        this.context = context;
+
+        const paper = context.paper;
 
         this.path = new paper.Path();
+        this.path.data = this;
         this.path.strokeColor = new paper.Color("black");
 
         this.fromNode.MoveEvent.on(this.update);
@@ -39,6 +46,7 @@ export class RenderConnection extends GraphConnection {
     }
 
     dispose() {
+        this.path.data = undefined;
         this.path.remove();
         this.fromNode.MoveEvent.off(this.update);
         this.toNode.MoveEvent.off(this.update);

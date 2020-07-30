@@ -10,7 +10,8 @@ export class GraphNode implements INode {
     protected _connections: IConnection[];
     protected _position: paper.Point;
 
-    public readonly MoveEvent = new TypedEvent<INode, MoveEvent>();
+    readonly type = "node";
+    readonly MoveEvent = new TypedEvent<INode, MoveEvent>();
 
     constructor(id: number, center: paper.Point) {
         this._nodeId = id;
@@ -38,14 +39,14 @@ export class GraphNode implements INode {
      */
     getConnections(nodeId?: number): IConnection[] {
         if (nodeId !== undefined) {
-            return this._connections.filter((x) => x.fromNode.id === nodeId || x.toNode.id === nodeId);
+            return this._connections.filter((x) => x.fromNode?.id === nodeId || x.toNode?.id === nodeId);
         } else {
             return this._connections;
         }
     }
 
     addConnection(connection: IConnection) {
-        if (connection.fromNode.id !== this._nodeId && connection.toNode.id !== this._nodeId) {
+        if (connection.fromNode !== this && connection.toNode !== this) {
             throw new Error("Connection is does not include this node");
         }
 
@@ -75,6 +76,7 @@ export class RenderNode extends GraphNode {
         const paper = context.paper;
 
         this.group = new paper.Group();
+        this.group.data = this;
 
         this.group.onMouseDrag = this.onDrag;
         this.group.onMouseEnter = this.onMouseEnter;
@@ -104,7 +106,6 @@ export class RenderNode extends GraphNode {
     onDrag = (e: paper.MouseEvent) => {
         if (this.context.interactionMode === InteractionMode.Move) {
             e.stopPropagation();
-            console.log(e);
             this.position = this.position.add(e.delta);
         }
     };
@@ -116,6 +117,7 @@ export class RenderNode extends GraphNode {
     };
 
     dispose() {
+        this.group.data = undefined;
         this.group.remove();
     }
 }

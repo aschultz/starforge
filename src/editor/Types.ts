@@ -21,8 +21,13 @@ export type MoveEvent = {
     newPosition: paper.Point;
 };
 
-export interface INode {
+export interface IEntity {
     readonly id: number;
+    readonly type: string;
+}
+
+export interface INode extends IEntity {
+    readonly type: "node";
     readonly MoveEvent: TypedEvent<INode, MoveEvent>;
 
     position: paper.Point;
@@ -34,11 +39,23 @@ export interface INode {
     dispose(): void;
 }
 
-export interface IConnection {
-    id: number;
+export interface IConnection extends IEntity {
+    readonly type: "link";
     fromNode: INode;
     toNode: INode;
-    type: ConnectionType;
+    connectionType: ConnectionType;
 
     dispose(): void;
+}
+
+export interface ITool {
+    isActive: boolean;
+    activate(): void;
+    deactivate(): void;
+    dispose(): void;
+}
+
+export interface IEditor {
+    createNode(p: paper.Point): void;
+    //removeNode(p: paper.Point): void;
 }

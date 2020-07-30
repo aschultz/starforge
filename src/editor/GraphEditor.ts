@@ -1,34 +1,48 @@
 import { EditorContext } from "./Context";
 import { RenderConnection } from "./Connection";
 import { RenderNode } from "./Node";
-import { InteractionMode, PaperMouseEvent, PaperKeyEvent, IConnection, INode } from "./Types";
-import { Point } from "paper/dist/paper-core";
+import { InteractionMode, PaperMouseEvent, PaperKeyEvent, IConnection, INode, IEntity, ITool, IEditor } from "./Types";
+import { ZoomTool } from "./tools/ZoomTool";
+import { MoveTool } from "./tools/MoveTool";
+import { AddTool } from "./tools/AddTool";
+import { ConnectionTool } from "./tools/ConnectionTool";
 
-export class GraphEditor {
+function getEntity(item?: paper.Item): IEntity | undefined {
+    let current = item;
+    while (current != undefined && current.data === undefined) {
+        current = current.parent;
+    }
+    return current ? (current.data as IEntity) : undefined;
+}
+
+export class GraphEditor implements IEditor {
     context!: EditorContext;
 
     maxId = 0;
     nodes = new Map<number, RenderNode>();
     connections = new Map<number, RenderConnection>();
 
-    isDragging = false;
-
-    tempConnection!: paper.Path;
+    zoomTool!: ZoomTool;
+    moveTool!: MoveTool;
+    addTool!: AddTool;
+    connectionTool!: ConnectionTool;
 
     attach(canvas: HTMLCanvasElement) {
-        this.context = new EditorContext(canvas);
-
-        this.context.canvas.addEventListener("wheel", this.onWheel);
+        this.context = new EditorContext(canvas, this);
+        this.zoomTool = new ZoomTool(this.context);
+        this.moveTool = new MoveTool(this.context);
+        this.addTool = new AddTool(this.context);
+        this.connectionTool = new ConnectionTool(this.context);
 
         const paper = this.context.paper;
         const view = this.context.view;
-        view.onClick = this.onClick;
-        view.onMouseDown = this.onMouseDown;
-        view.onMouseUp = this.onMouseUp;
-        view.onMouseDrag = this.onMouseDrag;
-        view.onMouseMove = this.onMouseMove;
-        (view as any).onKeyDown = this.onKeyDown;
-        (view as any).onKeyUp = this.onKeyUp;
+        view.on("click", this.onClick);
+        view.on("mousedown", this.onMouseDown);
+        view.on("mouseup", this.onMouseUp);
+        view.on("mousedrag", this.onMouseDrag);
+        view.on("mousemove", this.onMouseMove);
+        view.on("keydown", this.onKeyDown);
+        view.on("keyup", this.onKeyUp);
 
         // Draw an indicator at the center of the canvas
         const a = new paper.Path.Line(new paper.Point(-5, 0), new paper.Point(5, 0));
@@ -37,66 +51,32 @@ export class GraphEditor {
         cross.strokeColor = new paper.Color("black");
         this.context.backgroundLayer.addChild(cross);
 
-        this.tempConnection = new paper.Path.Line(new paper.Point(0, 0), new paper.Point(0, 0));
-        this.tempConnection.strokeColor = new paper.Color("black");
-        this.tempConnection!.visible = false;
-        this.context.connectionsLayer.addChild(this.tempConnection);
-
         this.setMode(InteractionMode.Move);
     }
 
     detach() {
-        if (this.context) {
-            this.context.canvas.removeEventListener("wheel", this.onWheel);
-            this.context.dispose();
-        }
+        this.zoomTool?.dispose();
+        this.moveTool?.dispose();
+        this.addTool?.dispose();
+        this.connectionTool?.dispose();
+        this.context?.dispose();
     }
 
-    onClick = (e: PaperMouseEvent) => {
-        const context = this.context!;
-        if (e.event.button === 0) {
-            if (context.interactionMode === InteractionMode.Add) {
-                this.createNode(e.point);
-            } else if (context.interactionMode === InteractionMode.Connect) {
-                // Hit test. If we hit a box, start or end a connection
-                // If we miss, do nothing
-                const results = context.project.hitTest(e.point, {
-                    fill: true,
-                    stroke: true,
-                    bounds: true,
-                    hitTolerance: 2,
-                });
-                console.log(results);
-            }
-        }
+    resetZoom = () => {
+        this.zoomTool?.resetZoom();
     };
 
+    // Fired when MouseDown and MouseUp happen inside the same entity
+    onClick = (e: PaperMouseEvent) => {};
     onMouseDown = (e: PaperMouseEvent) => {};
-
-    onMouseUp = (e: PaperMouseEvent) => {
-        this.isDragging = false;
-    };
-
+    onMouseUp = (e: PaperMouseEvent) => {};
     onMouseMove = (e: PaperMouseEvent) => {
-        // If connection has started, update connection end position
+        this.context.mousePosition = e.point;
     };
-
-    onMouseDrag = (e: PaperMouseEvent) => {
-        const context = this.context;
-        if (context.interactionMode === InteractionMode.Move) {
-            this.isDragging = true;
-
-            // Move the camera around
-            const view = this.context.view;
-            const movement = new Point(e.event.movementX, e.event.movementY);
-            const correctedMove = movement.divide(view.zoom);
-
-            view.center = view.center.subtract(correctedMove);
-        }
-    };
+    onMouseDrag = (e: PaperMouseEvent) => {};
 
     onKeyDown = (e: PaperKeyEvent) => {
-        if (e.event.repeat || this.isDragging) {
+        if (e.event.repeat || this.moveTool.isDragging) {
             return;
         }
 
@@ -106,9 +86,10 @@ export class GraphEditor {
             this.setMode(InteractionMode.Connect);
         }
     };
+
     onKeyUp = (e: PaperKeyEvent) => {
         const context = this.context;
-        if (this.isDragging) {
+        if (this.moveTool.isDragging) {
             return;
         }
 
@@ -120,61 +101,37 @@ export class GraphEditor {
     };
 
     setMode(newMode: InteractionMode) {
-        const context = this.context;
-        if (context.interactionMode === newMode) {
+        const currentMode = this.context.interactionMode;
+        if (currentMode === newMode) {
             return;
         }
 
-        if (context.interactionMode === InteractionMode.Connect) {
-            // Clear in-progress connection
+        switch (currentMode) {
+            case InteractionMode.Move:
+                this.moveTool.deactivate();
+                break;
+            case InteractionMode.Add:
+                this.addTool.deactivate();
+                break;
+            case InteractionMode.Connect:
+                this.connectionTool.deactivate();
+                break;
         }
 
-        const canvas = this.context.canvas;
-
-        if (newMode === InteractionMode.Add) {
-            canvas.style.cursor = "cell";
-        } else if (newMode === InteractionMode.Connect) {
-            canvas.style.cursor = "crosshair";
-        } else {
-            canvas.style.cursor = "default";
+        switch (newMode) {
+            case InteractionMode.Move:
+                this.moveTool.activate();
+                break;
+            case InteractionMode.Add:
+                this.addTool.activate();
+                break;
+            case InteractionMode.Connect:
+                this.connectionTool.activate();
+                break;
         }
-        // TODO: Force a redraw to get the cursor to update without moving the mouse
 
-        context.interactionMode = newMode;
+        this.context.interactionMode = newMode;
     }
-
-    onWheel = (e: WheelEvent) => {
-        // Prevent zooming the browser window with Ctrl+Scroll. Only zoom the canvas.
-        e.preventDefault();
-
-        const view = this.context!.view;
-
-        // Zoom the camera
-        const deltaY = e.deltaY;
-        const currentZoom = view.zoom;
-        const currentPosition = view.center;
-
-        // TODO: Zoom based on cursor position
-
-        const zoomFactor = 1 + 0.1 * (Math.abs(deltaY) / 120);
-        const maxZoom = 4.0;
-        const minZoom = 0.25;
-        let newZoom = deltaY < 0 ? currentZoom * zoomFactor : currentZoom / zoomFactor;
-        // Clamp
-        newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
-        // Snap to 1 if close enough
-        if (Math.abs(newZoom - 1) < 0.05) {
-            newZoom = 1;
-        }
-
-        view.zoom = newZoom;
-    };
-
-    resetZoom = () => {
-        if (this.context) {
-            this.context.view.zoom = 1;
-        }
-    };
 
     createNode = (position: paper.Point) => {
         let node = new RenderNode(++this.maxId, position, this.context);
@@ -226,5 +183,22 @@ export class GraphEditor {
         connection.toNode.removeConnection(connection);
         connection.dispose();
         this.connections.delete(connection.id);
+    };
+
+    getNodeAtPoint = (point: paper.Point): INode | undefined => {
+        const results = this.context.project.hitTest(point, {
+            fill: true,
+            stroke: true,
+            bounds: true,
+            hitTolerance: 2,
+        });
+
+        if (results) {
+            const entity = getEntity(results.item);
+            if (entity && entity.type == "node") {
+                return entity as INode;
+            }
+        }
+        return undefined;
     };
 }
