@@ -65,6 +65,7 @@ class _App extends React.Component<Props> {
     private onRef = (instance: HTMLCanvasElement | null) => {
         if (instance) {
             this.editor.attach(instance);
+            // TODO: Hook up handlers to show React popups when certain actions happen
         } else {
             this.editor.detach();
         }

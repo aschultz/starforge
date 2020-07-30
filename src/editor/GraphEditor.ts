@@ -9,7 +9,7 @@ import { ConnectionTool } from "./tools/ConnectionTool";
 
 function getEntity(item?: paper.Item): IEntity | undefined {
     let current = item;
-    while (current != undefined && current.data["entity"] === undefined) {
+    while (current !== undefined && current.data["entity"] === undefined) {
         current = current.parent;
     }
     return current ? (current.data["entity"] as IEntity) : undefined;
@@ -62,6 +62,7 @@ export class GraphEditor implements IEditor {
 
     resetZoom = () => {
         this.zoomTool?.resetZoom();
+        this.context.view.center = new this.context.paper.Point(0, 0);
     };
 
     onKeyDown = (e: PaperKeyEvent) => {
@@ -182,7 +183,7 @@ export class GraphEditor implements IEditor {
 
         if (results) {
             const entity = getEntity(results.item);
-            if (entity && entity.type == "node") {
+            if (entity && entity.type === "node") {
                 return entity as INode;
             }
         }

@@ -1,4 +1,4 @@
-import { IConnection, INode, ConnectionType } from "./Types";
+import { IConnection, INode, ConnectionType, PaperMouseEvent } from "./Types";
 import { EditorContext } from "./Context";
 
 export class GraphConnection implements IConnection {
@@ -34,6 +34,7 @@ export class RenderConnection extends GraphConnection {
         this.path = new paper.Path.Line(new paper.Point(0, 0), new paper.Point(0, 0));
         this.path.data["entity"] = this;
         this.path.strokeColor = new paper.Color("black");
+        this.path.strokeWidth = 2;
         this.context.connectionsLayer.addChild(this.path);
 
         this.fromNode.MoveEvent.on(this.update);
@@ -41,15 +42,15 @@ export class RenderConnection extends GraphConnection {
         this.update();
     }
 
-    update = () => {
-        this.path.firstSegment.point = this.fromNode.position;
-        this.path.lastSegment.point = this.toNode.position;
-    };
-
     dispose() {
         this.path.data["entity"] = undefined;
         this.path.remove();
         this.fromNode.MoveEvent.off(this.update);
         this.toNode.MoveEvent.off(this.update);
     }
+
+    update = () => {
+        this.path.firstSegment.point = this.fromNode.position;
+        this.path.lastSegment.point = this.toNode.position;
+    };
 }

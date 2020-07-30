@@ -76,22 +76,6 @@ export class RenderNode extends GraphNode {
 
         const paper = context.paper;
 
-        this.group = new paper.Group();
-        this.group.data["entity"] = this;
-
-        this.group.on("mousedrag", this.onDrag);
-        this.group.on("mouseenter", this.onMouseEnter);
-        this.group.on("mouseleave", this.onMouseLeave);
-        this.group.on("doubleclick", this.onDoubleClick);
-        this.group.position = this.position;
-
-        const width = 100;
-        const height = 50;
-        const bounds = new paper.Rectangle(center.x - width / 2, center.y - height / 2, width, height);
-        this.box = new paper.Path.Rectangle(bounds);
-        this.box.strokeColor = new paper.Color("black");
-        this.box.fillColor = new paper.Color("white");
-
         this.text = new paper.PointText(center);
         this.text.fillColor = new paper.Color("black");
         this.text.content = "This is a test of the node\r\ncreation tool";
@@ -99,8 +83,17 @@ export class RenderNode extends GraphNode {
         this.text.fontFamily = "Arial";
         this.text.fontSize = 14;
 
-        this.box.bounds = this.text.strokeBounds.expand(20);
+        this.box = new paper.Path.Rectangle(this.text.strokeBounds.expand(20));
+        this.box.strokeColor = new paper.Color("black");
+        this.box.fillColor = new paper.Color("white");
 
+        this.group = new paper.Group();
+        this.group.data["entity"] = this;
+        this.group.on("mousedrag", this.onDrag);
+        this.group.on("mouseenter", this.onMouseEnter);
+        this.group.on("mouseleave", this.onMouseLeave);
+        this.group.on("doubleclick", this.onDoubleClick);
+        this.group.position = center;
         this.group.addChild(this.box);
         this.group.addChild(this.text);
         context.nodesLayer.addChild(this.group);
