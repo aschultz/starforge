@@ -1,4 +1,4 @@
-import { Dictionary, INode, IConnection, InteractionMode, MoveEvent } from "./Types";
+import { Dictionary, INode, IConnection, InteractionMode, MoveEvent, PaperMouseEvent } from "./Types";
 import { EditorContext } from "./Context";
 import { removeItem } from "./Collections";
 import { TypedEvent } from "./Emitter";
@@ -68,6 +68,7 @@ export class RenderNode extends GraphNode {
     context: EditorContext;
     group: paper.Group;
     box: paper.Path;
+    text: paper.PointText;
 
     constructor(id: number, center: paper.Point, context: EditorContext) {
         super(id, center);
@@ -76,11 +77,12 @@ export class RenderNode extends GraphNode {
         const paper = context.paper;
 
         this.group = new paper.Group();
-        this.group.data = this;
+        this.group.data["entity"] = this;
 
-        this.group.onMouseDrag = this.onDrag;
-        this.group.onMouseEnter = this.onMouseEnter;
-        this.group.onMouseLeave = this.onMouseLeave;
+        this.group.on("mousedrag", this.onDrag);
+        this.group.on("mouseenter", this.onMouseEnter);
+        this.group.on("mouseleave", this.onMouseLeave);
+        this.group.on("doubleclick", this.onDoubleClick);
         this.group.position = this.position;
 
         const width = 100;
@@ -90,8 +92,23 @@ export class RenderNode extends GraphNode {
         this.box.strokeColor = new paper.Color("black");
         this.box.fillColor = new paper.Color("white");
 
+        this.text = new paper.PointText(center);
+        this.text.fillColor = new paper.Color("black");
+        this.text.content = "This is a test of the node\r\ncreation tool";
+        this.text.justification = "center";
+        this.text.fontFamily = "Arial";
+        this.text.fontSize = 14;
+
+        this.box.bounds = this.text.strokeBounds.expand(20);
+
         this.group.addChild(this.box);
+        this.group.addChild(this.text);
         context.nodesLayer.addChild(this.group);
+    }
+
+    dispose() {
+        this.group.data["entity"] = undefined;
+        this.group.remove();
     }
 
     get position(): paper.Point {
@@ -103,21 +120,19 @@ export class RenderNode extends GraphNode {
         super["position"] = p;
     }
 
-    onDrag = (e: paper.MouseEvent) => {
+    onDrag = (e: PaperMouseEvent) => {
         if (this.context.interactionMode === InteractionMode.Move) {
             e.stopPropagation();
             this.position = this.position.add(e.delta);
         }
     };
-    onMouseEnter = (e: paper.MouseEvent) => {
+    onMouseEnter = (e: PaperMouseEvent) => {
         this.box.selected = true;
     };
-    onMouseLeave = (e: paper.MouseEvent) => {
+    onMouseLeave = (e: PaperMouseEvent) => {
         this.box.selected = false;
     };
-
-    dispose() {
-        this.group.data = undefined;
-        this.group.remove();
-    }
+    onDoubleClick = (e: PaperMouseEvent) => {
+        console.log("DBLCLICK", e);
+    };
 }

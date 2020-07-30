@@ -9,10 +9,10 @@ import { ConnectionTool } from "./tools/ConnectionTool";
 
 function getEntity(item?: paper.Item): IEntity | undefined {
     let current = item;
-    while (current != undefined && current.data === undefined) {
+    while (current != undefined && current.data["entity"] === undefined) {
         current = current.parent;
     }
-    return current ? (current.data as IEntity) : undefined;
+    return current ? (current.data["entity"] as IEntity) : undefined;
 }
 
 export class GraphEditor implements IEditor {
@@ -34,13 +34,11 @@ export class GraphEditor implements IEditor {
         this.addTool = new AddTool(this.context);
         this.connectionTool = new ConnectionTool(this.context);
 
+        this.zoomTool.activate();
+        this.moveTool.activate();
+
         const paper = this.context.paper;
         const view = this.context.view;
-        view.on("click", this.onClick);
-        view.on("mousedown", this.onMouseDown);
-        view.on("mouseup", this.onMouseUp);
-        view.on("mousedrag", this.onMouseDrag);
-        view.on("mousemove", this.onMouseMove);
         view.on("keydown", this.onKeyDown);
         view.on("keyup", this.onKeyUp);
 
@@ -65,15 +63,6 @@ export class GraphEditor implements IEditor {
     resetZoom = () => {
         this.zoomTool?.resetZoom();
     };
-
-    // Fired when MouseDown and MouseUp happen inside the same entity
-    onClick = (e: PaperMouseEvent) => {};
-    onMouseDown = (e: PaperMouseEvent) => {};
-    onMouseUp = (e: PaperMouseEvent) => {};
-    onMouseMove = (e: PaperMouseEvent) => {
-        this.context.mousePosition = e.point;
-    };
-    onMouseDrag = (e: PaperMouseEvent) => {};
 
     onKeyDown = (e: PaperKeyEvent) => {
         if (e.event.repeat || this.moveTool.isDragging) {
@@ -186,10 +175,8 @@ export class GraphEditor implements IEditor {
     };
 
     getNodeAtPoint = (point: paper.Point): INode | undefined => {
-        const results = this.context.project.hitTest(point, {
+        const results = this.context.nodesLayer.hitTest(point, {
             fill: true,
-            stroke: true,
-            bounds: true,
             hitTolerance: 2,
         });
 

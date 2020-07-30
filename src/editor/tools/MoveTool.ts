@@ -8,10 +8,8 @@ export class MoveTool implements ITool {
 
     constructor(context: EditorContext) {
         this.context = context;
-        this.isActive = true;
+        this.isActive = false;
         this.isDragging = false;
-
-        this.activate();
     }
 
     dispose() {

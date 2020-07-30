@@ -7,9 +7,7 @@ export class ZoomTool implements ITool {
 
     constructor(context: EditorContext) {
         this.context = context;
-        this.isActive = true;
-
-        this.activate();
+        this.isActive = false;
     }
 
     dispose() {

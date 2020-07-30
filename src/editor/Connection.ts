@@ -31,22 +31,23 @@ export class RenderConnection extends GraphConnection {
 
         const paper = context.paper;
 
-        this.path = new paper.Path();
-        this.path.data = this;
+        this.path = new paper.Path.Line(new paper.Point(0, 0), new paper.Point(0, 0));
+        this.path.data["entity"] = this;
         this.path.strokeColor = new paper.Color("black");
+        this.context.connectionsLayer.addChild(this.path);
 
         this.fromNode.MoveEvent.on(this.update);
         this.toNode.MoveEvent.on(this.update);
         this.update();
     }
 
-    update() {
+    update = () => {
         this.path.firstSegment.point = this.fromNode.position;
         this.path.lastSegment.point = this.toNode.position;
-    }
+    };
 
     dispose() {
-        this.path.data = undefined;
+        this.path.data["entity"] = undefined;
         this.path.remove();
         this.fromNode.MoveEvent.off(this.update);
         this.toNode.MoveEvent.off(this.update);

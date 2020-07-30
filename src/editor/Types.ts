@@ -58,4 +58,7 @@ export interface ITool {
 export interface IEditor {
     createNode(p: paper.Point): void;
     //removeNode(p: paper.Point): void;
+    getNodeAtPoint(point: paper.Point): INode | undefined;
+
+    createConnection(nodeA: number, nodeB: number): void;
 }

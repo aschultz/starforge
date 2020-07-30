@@ -41,6 +41,7 @@ export class EditorContext {
     }
 
     dispose() {
+        this.view.off("mousemove", this.onMouseMove);
         this.project.remove();
     }
 

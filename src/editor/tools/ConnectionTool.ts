@@ -1,10 +1,12 @@
-import { ITool, PaperMouseEvent } from "../Types";
+import { ITool, PaperMouseEvent, INode } from "../Types";
 import { EditorContext } from "../Context";
 
 export class ConnectionTool implements ITool {
+    isActive: boolean;
     context: EditorContext;
     path: paper.Path;
-    isActive: boolean;
+
+    startNode: INode | undefined;
 
     constructor(context: EditorContext) {
         this.context = context;
@@ -25,7 +27,6 @@ export class ConnectionTool implements ITool {
 
     activate() {
         this.isActive = true;
-        this.path.visible = true;
         this.context.canvas.style.cursor = "crosshair";
         this.context.view.on("click", this.onMouseClick);
         this.context.view.on("mousemove", this.onMouseMove);
@@ -37,6 +38,7 @@ export class ConnectionTool implements ITool {
         this.context.canvas.style.cursor = "auto";
         this.context.view.off("click", this.onMouseClick);
         this.context.view.off("mousemove", this.onMouseMove);
+        this.startNode = undefined;
     }
 
     onMouseMove = (p: PaperMouseEvent) => {
@@ -44,6 +46,19 @@ export class ConnectionTool implements ITool {
     };
 
     onMouseClick = (p: PaperMouseEvent) => {
-        // TODO: Hit test
+        const hitNode = this.context.editor.getNodeAtPoint(p.point);
+        if (hitNode) {
+            if (this.startNode === undefined) {
+                // Start a new connection
+                this.startNode = hitNode;
+                this.path.firstSegment.point = p.point;
+                this.path.lastSegment.point = p.point;
+                this.path.visible = true;
+            } else {
+                this.context.editor.createConnection(this.startNode.id, hitNode.id);
+                this.startNode = undefined;
+                this.path.visible = false;
+            }
+        }
     };
 }

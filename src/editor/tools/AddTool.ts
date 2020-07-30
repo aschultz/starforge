@@ -7,7 +7,7 @@ export class AddTool implements ITool {
 
     constructor(context: EditorContext) {
         this.context = context;
-        this.isActive = true;
+        this.isActive = false;
     }
 
     dispose() {
