@@ -8,8 +8,10 @@ export type PaperKeyEvent = paper.KeyEvent & { event: KeyboardEvent };
 
 export enum ConnectionType {
     Directed,
-    Bidirectional,
+    Undirected,
 }
+
+export type ConnectionDirection = "from" | "to" | "none" | undefined;
 
 export enum InteractionMode {
     Move,
@@ -34,6 +36,7 @@ export interface INode extends IEntity {
 
     addConnection(connection: IConnection): void;
     getConnections(nodeId?: number): IConnection[];
+    getConnection(nodeId: number, direction: ConnectionDirection): IConnection | undefined;
     removeConnection(connection: IConnection): void;
 
     dispose(): void;
@@ -46,6 +49,8 @@ export interface IConnection extends IEntity {
     connectionType: ConnectionType;
 
     dispose(): void;
+
+    isMatchingConnection(a: number, b: number, direction?: ConnectionDirection): boolean;
 }
 
 export interface ITool {
@@ -56,9 +61,16 @@ export interface ITool {
 }
 
 export interface IEditor {
-    createNode(p: paper.Point): void;
-    //removeNode(p: paper.Point): void;
-    getNodeAtPoint(point: paper.Point): INode | undefined;
+    createNode(p: paper.Point): INode;
+    createConnection(nodeA: number, nodeB: number, directional: boolean): IConnection;
 
-    createConnection(nodeA: number, nodeB: number): void;
+    removeEntityAtPoint(p: paper.Point): void;
+
+    startEditing(entity: IEntity): void;
+
+    getEntityAtPoint(point: paper.Point, hitTolerance: number): IEntity | undefined;
+    getNodeAtPoint(point: paper.Point): INode | undefined;
+    getConnectionAtPoint(point: paper.Point): IConnection | undefined;
+
+    saveToDotFile(): void;
 }

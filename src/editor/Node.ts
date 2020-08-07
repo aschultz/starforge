@@ -1,8 +1,16 @@
-import { Dictionary, INode, IConnection, InteractionMode, MoveEvent, PaperMouseEvent } from "./Types";
+import {
+    Dictionary,
+    INode,
+    IConnection,
+    InteractionMode,
+    MoveEvent,
+    PaperMouseEvent,
+    ConnectionType,
+    ConnectionDirection,
+} from "./Types";
 import { EditorContext } from "./Context";
 import { removeItem } from "./Collections";
 import { TypedEvent } from "./Emitter";
-import { Point } from "paper/dist/paper-core";
 
 export class GraphNode implements INode {
     protected readonly _nodeId: number;
@@ -34,15 +42,19 @@ export class GraphNode implements INode {
     }
 
     /**
-     * Gets connections that include this code
-     * @param node (Optional) Include only connections with the specified node
+     * Gets connections between this node and others
+     * @param otherNodeId (Optional) Include only connections to or from the specified node
      */
-    getConnections(nodeId?: number): IConnection[] {
-        if (nodeId !== undefined) {
-            return this._connections.filter((x) => x.fromNode?.id === nodeId || x.toNode?.id === nodeId);
+    getConnections(otherNodeId?: number): IConnection[] {
+        if (otherNodeId !== undefined) {
+            return this._connections.filter((x) => x.isMatchingConnection(this.id, otherNodeId));
         } else {
             return this._connections;
         }
+    }
+
+    getConnection(otherNodeId: number, direction: ConnectionDirection): IConnection | undefined {
+        return this._connections.find((x) => x.isMatchingConnection(this.id, otherNodeId, direction));
     }
 
     addConnection(connection: IConnection) {
@@ -87,15 +99,13 @@ export class RenderNode extends GraphNode {
         this.box.strokeColor = new paper.Color("black");
         this.box.fillColor = new paper.Color("white");
 
-        this.group = new paper.Group();
+        this.group = new paper.Group([this.box, this.text]);
         this.group.data["entity"] = this;
         this.group.on("mousedrag", this.onDrag);
         this.group.on("mouseenter", this.onMouseEnter);
         this.group.on("mouseleave", this.onMouseLeave);
         this.group.on("doubleclick", this.onDoubleClick);
         this.group.position = center;
-        this.group.addChild(this.box);
-        this.group.addChild(this.text);
         context.nodesLayer.addChild(this.group);
     }
 
@@ -126,6 +136,6 @@ export class RenderNode extends GraphNode {
         this.box.selected = false;
     };
     onDoubleClick = (e: PaperMouseEvent) => {
-        console.log("DBLCLICK", e);
+        this.context.editor.startEditing(this);
     };
 }

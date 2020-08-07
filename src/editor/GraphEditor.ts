@@ -1,12 +1,27 @@
 import { EditorContext } from "./Context";
 import { RenderConnection } from "./Connection";
 import { RenderNode } from "./Node";
-import { InteractionMode, PaperMouseEvent, PaperKeyEvent, IConnection, INode, IEntity, ITool, IEditor } from "./Types";
+import {
+    InteractionMode,
+    PaperMouseEvent,
+    PaperKeyEvent,
+    IConnection,
+    INode,
+    IEntity,
+    ITool,
+    IEditor,
+    ConnectionType,
+} from "./Types";
 import { ZoomTool } from "./tools/ZoomTool";
 import { MoveTool } from "./tools/MoveTool";
 import { AddTool } from "./tools/AddTool";
 import { ConnectionTool } from "./tools/ConnectionTool";
+import { saveAsDotFile } from "./io/DotFile";
 
+/**
+ * Given a Paper item, walks up the scene graph looking for an attached entity
+ * @param item The item to start the search at
+ */
 function getEntity(item?: paper.Item): IEntity | undefined {
     let current = item;
     while (current !== undefined && current.data["entity"] === undefined) {
@@ -16,6 +31,7 @@ function getEntity(item?: paper.Item): IEntity | undefined {
 }
 
 export class GraphEditor implements IEditor {
+    isAttached: boolean = false;
     context!: EditorContext;
 
     maxId = 0;
@@ -28,6 +44,11 @@ export class GraphEditor implements IEditor {
     connectionTool!: ConnectionTool;
 
     attach(canvas: HTMLCanvasElement) {
+        if (this.isAttached) {
+            return;
+        }
+        this.isAttached = true;
+
         this.context = new EditorContext(canvas, this);
         this.zoomTool = new ZoomTool(this.context);
         this.moveTool = new MoveTool(this.context);
@@ -58,6 +79,7 @@ export class GraphEditor implements IEditor {
         this.addTool?.dispose();
         this.connectionTool?.dispose();
         this.context?.dispose();
+        this.isAttached = false;
     }
 
     resetZoom = () => {
@@ -126,6 +148,7 @@ export class GraphEditor implements IEditor {
     createNode = (position: paper.Point) => {
         let node = new RenderNode(++this.maxId, position, this.context);
         this.nodes.set(node.id, node);
+        return node;
     };
 
     removeNode = (n: number | INode) => {
@@ -143,7 +166,7 @@ export class GraphEditor implements IEditor {
         this.nodes.delete(node.id);
     };
 
-    createConnection = (from: number, to: number) => {
+    createConnection = (from: number, to: number, directional: boolean) => {
         // See if we already have a connection between these two nodes
         const startNode = this.nodes.get(from);
         const endNode = this.nodes.get(to);
@@ -151,16 +174,17 @@ export class GraphEditor implements IEditor {
             throw Error("Invalid node address to create connection");
         }
 
-        const existingConnections = startNode.getConnections(endNode.id);
-        if (existingConnections.length > 0) {
-            return;
+        const existingConnection = startNode.getConnection(endNode.id, directional ? "to" : "none");
+        if (existingConnection) {
+            return existingConnection;
+        } else {
+            const newConnection = new RenderConnection(++this.maxId, startNode, endNode, this.context);
+            startNode.addConnection(newConnection);
+            endNode.addConnection(newConnection);
+
+            this.connections.set(newConnection.id, newConnection);
+            return newConnection;
         }
-
-        const connection = new RenderConnection(++this.maxId, startNode, endNode, this.context);
-        startNode.addConnection(connection);
-        endNode.addConnection(connection);
-
-        this.connections.set(connection.id, connection);
     };
 
     removeConnection = (c: number | IConnection) => {
@@ -175,18 +199,51 @@ export class GraphEditor implements IEditor {
         this.connections.delete(connection.id);
     };
 
+    removeEntityAtPoint = (p: paper.Point): void => {
+        const entity = this.getEntityAtPoint(p);
+        if (entity) {
+            if (entity.type === "node") {
+                this.removeNode(entity.id);
+            } else if (entity.type === "link") {
+                this.removeConnection(entity.id);
+            }
+        }
+    };
+
     getNodeAtPoint = (point: paper.Point): INode | undefined => {
+        const entity = this.getEntityAtPoint(point, 2);
+        if (entity && entity.type === "node") {
+            return entity as INode;
+        }
+        return;
+    };
+
+    getConnectionAtPoint = (point: paper.Point): IConnection | undefined => {
+        const entity = this.getEntityAtPoint(point, 2);
+        if (entity && entity.type === "link") {
+            return entity as IConnection;
+        }
+        return;
+    };
+
+    getEntityAtPoint = (point: paper.Point, hitTolerance = 0): IEntity | undefined => {
         const results = this.context.nodesLayer.hitTest(point, {
             fill: true,
-            hitTolerance: 2,
+            stroke: true,
+            hitTolerance,
         });
 
         if (results) {
-            const entity = getEntity(results.item);
-            if (entity && entity.type === "node") {
-                return entity as INode;
-            }
+            return getEntity(results.item);
         }
-        return undefined;
+        return;
+    };
+
+    startEditing = (entity: IEntity) => {};
+
+    stopEditing = () => {};
+
+    saveToDotFile = () => {
+        saveAsDotFile([...this.nodes.values()]);
     };
 }

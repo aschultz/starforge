@@ -1,5 +1,26 @@
 import React from "react";
-import { Flex, Text, IconButton, Icon, Button, Heading, DefaultTheme, ITheme, Stack, Tooltip } from "@chakra-ui/core";
+import {
+    Flex,
+    Text,
+    IconButton,
+    Icon,
+    Button,
+    Heading,
+    DefaultTheme,
+    ITheme,
+    Stack,
+    Tooltip,
+    Drawer,
+    DrawerOverlay,
+    DrawerContent,
+    Input,
+    Box,
+    DrawerHeader,
+    DrawerFooter,
+    DrawerBody,
+    DrawerCloseButton,
+    Grid,
+} from "@chakra-ui/core";
 import { GraphEditor } from "./editor/GraphEditor";
 import "./App.css";
 import { withTheme } from "emotion-theming";
@@ -39,8 +60,7 @@ class _App extends React.Component<Props> {
                         StarForge
                     </Heading>
                     <Stack isInline={true} justify="right" spacing={"10px"} paddingY="10px">
-                        <IconButton icon="add" aria-label="Add" onClick={undefined} />
-                        <IconButton icon="delete" aria-label="Remove" onClick={undefined} />
+                        <IconButton icon="download" aria-label="Save" onClick={this.editor.saveToDotFile} />
                         <Tooltip label="Reset Zoom" aria-label="Reset Zoom" showDelay={500}>
                             <IconButton icon={MdZoomOutMap} aria-label="Reset Zoom" onClick={this.editor.resetZoom} />
                         </Tooltip>
@@ -58,6 +78,30 @@ class _App extends React.Component<Props> {
                         data-paper-resize
                     />
                 </Flex>
+
+                <Drawer isOpen={false} placement={"right"} size={"md"}>
+                    <DrawerOverlay />
+                    <DrawerContent>
+                        <DrawerCloseButton />
+                        <DrawerHeader>Configure</DrawerHeader>
+                        <DrawerBody>
+                            <Grid templateColumns={"125px auto"}>
+                                <Input placeholder={"Key"} />
+                                <Input placeholder={"Value"} />
+                                <Input placeholder={"Key"} />
+                                <Input placeholder={"Value"} />
+                                <Input placeholder={"Key"} />
+                                <Input placeholder={"Value"} />
+                            </Grid>
+                        </DrawerBody>
+                        <DrawerFooter>
+                            <Button variant={"outline"} mr={3}>
+                                Cancel
+                            </Button>
+                            <Button variantColor={"blue"}>Save</Button>
+                        </DrawerFooter>
+                    </DrawerContent>
+                </Drawer>
             </Flex>
         );
     }

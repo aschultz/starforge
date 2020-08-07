@@ -55,7 +55,7 @@ export class ConnectionTool implements ITool {
                 this.path.lastSegment.point = p.point;
                 this.path.visible = true;
             } else {
-                this.context.editor.createConnection(this.startNode.id, hitNode.id);
+                this.context.editor.createConnection(this.startNode.id, hitNode.id, true);
                 this.startNode = undefined;
                 this.path.visible = false;
             }
