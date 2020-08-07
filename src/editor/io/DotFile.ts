@@ -17,7 +17,7 @@ export function saveAsDotFile(nodes: INode[]) {
     // List out all nodes
     for (const node of nodes) {
         const attribs: Record<string, string> = {};
-
+        attribs["pos"] = `"${node.position.x},${node.position.y}"`;
         content += `${node.id} ${attribsToString(attribs)};\r\n`;
     }
 
